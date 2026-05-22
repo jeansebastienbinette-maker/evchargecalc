@@ -3,6 +3,8 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import vehicles from '@/data/vehicles.json';
 import locations from '@/data/locations.json';
+import stateContent from '@/data/state-content';
+import vehicleContent from '@/data/vehicle-content';
 import { calculateCosts, formatCurrency, formatCurrencyPrecise } from '@/lib/calculations';
 
 type Vehicle = typeof vehicles[0];
@@ -42,19 +44,92 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   };
 }
 
-const climateContext: Record<string, string> = {
-  hot: 'Hot climates can reduce EV range by 10–15% due to air conditioning load and battery thermal management. EV charging costs in hot states like Texas and Florida are generally below the national average.',
-  cold: 'Cold weather reduces EV range by 20–40% as the battery heats itself and the cabin. In cold states like Minnesota and Michigan, plan for higher effective charging costs per mile in winter months.',
-  moderate: 'Moderate climates provide near-optimal EV performance year-round. You can expect battery range close to EPA estimates and consistent charging costs.',
+const climateRangeNote: Record<string, string> = {
+  hot: 'Hot climates can reduce EV range by 10–15% due to air conditioning load and battery thermal management. Pre-conditioning your battery while still plugged in minimizes this effect.',
+  cold: 'Cold weather reduces EV range by 20–40% as the battery heats itself and the cabin. Use scheduled departure to pre-heat on shore power before driving.',
+  moderate: 'Moderate climates provide near-optimal EV performance year-round. Expect battery range close to EPA estimates and consistent charging costs across seasons.',
 };
 
-const vehicleContext: Record<string, string> = {
-  Sedan: 'Sedans offer excellent aerodynamics and some of the best efficiency ratings in the EV market.',
-  SUV: 'SUVs balance cargo space with reasonable efficiency, making them the most popular EV body style in the U.S.',
-  Truck: 'Electric trucks offer impressive towing and payload but trade some efficiency for capability. Payload capacity can vary with battery configuration.',
-  Hatchback: 'Hatchbacks deliver outstanding urban efficiency and are among the most cost-effective EVs to charge daily.',
+const bodyTypeIntro: Record<string, string> = {
+  Sedan: 'Sedans offer excellent aerodynamics and some of the highest efficiency ratings in the EV market, making them among the most cost-effective EVs to run daily.',
+  SUV: 'SUVs balance cargo space with reasonable efficiency, making them the most popular EV body style in the U.S. — and this one handles that balance well.',
+  Truck: 'Electric trucks offer impressive towing and payload but trade some efficiency for capability. The total cost advantage vs. a gas truck is still substantial.',
+  Hatchback: 'Hatchbacks deliver outstanding urban efficiency and are among the most cost-effective EVs to charge daily — especially on shorter commutes.',
   Van: 'Electric vans prioritize practicality and passenger capacity. Their larger batteries mean more range but higher charging costs per session.',
 };
+
+type FaqItem = { q: string; a: string };
+
+function buildFaqs(vehicle: Vehicle, location: typeof locations[0], costs: ReturnType<typeof calculateCosts>): FaqItem[] {
+  const base: FaqItem[] = [
+    {
+      q: `How much does it cost to charge a ${vehicle.brand} ${vehicle.model} at home in ${location.name}?`,
+      a: `At ${location.name}'s average residential rate of $${location.electricity_rate.toFixed(2)}/kWh, charging a ${vehicle.year} ${vehicle.brand} ${vehicle.model} at home costs approximately ${formatCurrency(costs.monthlyHomeCost, 0)}/month based on 1,000 miles of driving. A full charge costs ${formatCurrency(costs.costPerFullCharge, 2)}.`,
+    },
+    {
+      q: `How much does it cost to fully charge a ${vehicle.brand} ${vehicle.model}?`,
+      a: `A full charge of the ${vehicle.brand} ${vehicle.model}'s ${vehicle.battery_kwh} kWh battery costs ${formatCurrency(costs.costPerFullCharge, 2)} at ${location.name}'s rate of $${location.electricity_rate.toFixed(2)}/kWh. At a public DC fast charger ($0.49/kWh), that's about ${formatCurrency(vehicle.battery_kwh * 0.49, 2)}.`,
+    },
+    {
+      q: `Is it cheaper to charge a ${vehicle.brand} ${vehicle.model} or drive a gas car in ${location.name}?`,
+      a: `Home charging the ${vehicle.brand} ${vehicle.model} in ${location.name} costs ${formatCurrencyPrecise(costs.costPerMile)}/mile. A comparable 28 MPG gas car costs ${formatCurrencyPrecise(costs.monthlyGasCost / 1000)}/mile at ${location.name}'s gas price of $${location.gas_price.toFixed(2)}/gallon. EVs save approximately ${formatCurrency(costs.annualSavingsVsGas, 0)}/year.`,
+    },
+    {
+      q: `How long does it take to charge a ${vehicle.brand} ${vehicle.model} with DC fast charging?`,
+      a: `The ${vehicle.brand} ${vehicle.model} supports up to ${vehicle.dc_charge_speed_kw} kW DC fast charging. A 10–80% charge takes approximately ${costs.dcFastChargeTime} minutes at peak speed. Actual time varies by charger capacity, battery temperature, and current state of charge.`,
+    },
+    {
+      q: `How much does a ${vehicle.brand} ${vehicle.model} add to your electric bill in ${location.name}?`,
+      a: `Driving 1,000 miles/month in a ${vehicle.brand} ${vehicle.model} adds about ${formatCurrency(costs.monthlyHomeCost, 0)} to your monthly electric bill in ${location.name}. That's ${(100 / vehicle.efficiency_mi_per_kwh).toFixed(1)} kWh per 100 miles × $${location.electricity_rate.toFixed(2)}/kWh.`,
+    },
+  ];
+
+  const cold: FaqItem[] = [
+    {
+      q: `How does cold weather in ${location.name} affect ${vehicle.brand} ${vehicle.model} range?`,
+      a: `Cold winters in ${location.name} can reduce ${vehicle.brand} ${vehicle.model} range by 20–40%. With a ${vehicle.battery_kwh} kWh battery and ${vehicle.range_mi}-mile EPA range, plan for ${Math.round(vehicle.range_mi * 0.7)}–${Math.round(vehicle.range_mi * 0.8)} miles in cold conditions. Use the scheduled departure feature to pre-heat the cabin while still plugged in to preserve driving range.`,
+    },
+    {
+      q: `What is the best way to charge a ${vehicle.brand} ${vehicle.model} during ${location.name} winters?`,
+      a: `Keep the ${vehicle.brand} ${vehicle.model} plugged in when parked during ${location.name} winters — the battery management system uses grid power (not battery power) to maintain optimal temperature. Set a charging limit of 80–90% for daily use, and pre-condition the cabin 15–20 minutes before departure for maximum comfort and range.`,
+    },
+  ];
+
+  const hot: FaqItem[] = [
+    {
+      q: `How does ${location.name}'s heat affect ${vehicle.brand} ${vehicle.model} range and battery?`,
+      a: `High temperatures in ${location.name} increase air conditioning load and activate battery cooling systems, reducing effective range by 10–15%. With a ${vehicle.range_mi}-mile EPA range, expect ${Math.round(vehicle.range_mi * 0.87)}–${Math.round(vehicle.range_mi * 0.92)} miles during peak summer heat. Pre-conditioning the cabin while plugged in helps preserve battery charge for actual driving.`,
+    },
+    {
+      q: `Is it safe to charge a ${vehicle.brand} ${vehicle.model} in ${location.name}'s summer heat?`,
+      a: `Yes — the ${vehicle.brand} ${vehicle.model}'s thermal management system is designed for hot-weather operation. Avoid leaving the car with a full (100%) charge in direct sun for extended periods in peak summer heat. Daily charging to 80% is recommended for battery longevity in hot climates. Level 2 home charging during evening hours when temperatures drop is ideal.`,
+    },
+  ];
+
+  const truck: FaqItem[] = [
+    {
+      q: `How much does towing reduce the ${vehicle.brand} ${vehicle.model}'s range in ${location.name}?`,
+      a: `Towing with the ${vehicle.brand} ${vehicle.model} can reduce range by 40–60% depending on load and speed. On ${location.name}'s highways at 65 mph with a moderate trailer, plan for approximately ${Math.round(vehicle.range_mi * 0.45)}–${Math.round(vehicle.range_mi * 0.55)} miles per charge. Plan DCFC stops roughly every 100–120 miles when towing to maintain safe buffer.`,
+    },
+  ];
+
+  const suv: FaqItem[] = [
+    {
+      q: `What is the best charging setup for a ${vehicle.brand} ${vehicle.model} in ${location.name}?`,
+      a: `For a ${vehicle.brand} ${vehicle.model} owner in ${location.name}, a Level 2 home charger (at least 32A, preferably 48A) is the ideal setup. At ${location.name}'s rate of $${location.electricity_rate.toFixed(2)}/kWh, overnight home charging costs ${formatCurrency(costs.monthlyHomeCost, 0)}/month for 1,000 miles — significantly less than gas. DC fast charging at $0.49/kWh is 4–5× more expensive and best reserved for road trips.`,
+    },
+  ];
+
+  let extras: FaqItem[] = [];
+  if (location.climate === 'cold') extras = [...extras, ...cold];
+  if (location.climate === 'hot') extras = [...extras, ...hot];
+  if (vehicle.body_type === 'Truck') extras = [...extras, ...truck];
+  if (vehicle.body_type === 'SUV') extras = [...extras, ...suv];
+
+  const combined = [...base, ...extras];
+  const selected = combined.slice(0, 6);
+  return selected;
+}
 
 export default async function ProgrammaticPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
@@ -73,6 +148,9 @@ export default async function ProgrammaticPage({ params }: { params: Promise<{ s
     vehicle.dc_charge_speed_kw
   );
 
+  const sc = stateContent[location.slug];
+  const vc = vehicleContent[vehicle.slug];
+
   const nationalAvgRate = 0.17;
   const rateComparison = location.electricity_rate > nationalAvgRate
     ? `above the national average of $${nationalAvgRate.toFixed(2)}/kWh`
@@ -80,33 +158,10 @@ export default async function ProgrammaticPage({ params }: { params: Promise<{ s
       ? `below the national average of $${nationalAvgRate.toFixed(2)}/kWh`
       : `at the national average of $${nationalAvgRate.toFixed(2)}/kWh`;
 
-  // Related: same vehicle, other states (pick nearby / diverse)
   const relatedStates = locations.filter(l => l.slug !== location.slug).slice(0, 5);
-  // Related: same state, other vehicles (by same brand or random)
   const relatedVehicles = vehicles.filter(v => v.slug !== vehicle.slug && (v.brand === vehicle.brand || true)).slice(0, 5);
 
-  const faqs = [
-    {
-      q: `How much does it cost to charge a ${vehicle.brand} ${vehicle.model} at home in ${location.name}?`,
-      a: `At ${location.name}'s average residential rate of $${location.electricity_rate.toFixed(2)}/kWh, charging a ${vehicle.year} ${vehicle.brand} ${vehicle.model} at home costs approximately ${formatCurrency(costs.monthlyHomeCost, 0)}/month based on 1,000 miles of driving. A full charge costs ${formatCurrency(costs.costPerFullCharge, 2)}.`,
-    },
-    {
-      q: `How much does it cost to fully charge a ${vehicle.brand} ${vehicle.model}?`,
-      a: `A full charge of the ${vehicle.brand} ${vehicle.model}'s ${vehicle.battery_kwh} kWh battery costs ${formatCurrency(costs.costPerFullCharge, 2)} at ${location.name}'s rate of $${location.electricity_rate.toFixed(2)}/kWh. At a public DC fast charger ($0.49/kWh), that's about ${formatCurrency(vehicle.battery_kwh * 0.49, 2)}.`,
-    },
-    {
-      q: `How long does it take to charge a ${vehicle.brand} ${vehicle.model} with DC fast charging?`,
-      a: `The ${vehicle.brand} ${vehicle.model} supports up to ${vehicle.dc_charge_speed_kw} kW DC fast charging. A 10% to 80% charge takes approximately ${costs.dcFastChargeTime} minutes at peak speed (actual time varies by conditions and charge level).`,
-    },
-    {
-      q: `Is it cheaper to charge a ${vehicle.brand} ${vehicle.model} or drive a gas car in ${location.name}?`,
-      a: `Home charging the ${vehicle.brand} ${vehicle.model} in ${location.name} costs ${formatCurrencyPrecise(costs.costPerMile)}/mile. A comparable 28 MPG gas car costs ${formatCurrencyPrecise(costs.monthlyGasCost / 1000)}/mile at ${location.name}'s gas price of $${location.gas_price.toFixed(2)}/gallon. EVs save approximately ${formatCurrency(costs.annualSavingsVsGas, 0)}/year.`,
-    },
-    {
-      q: `How much does a ${vehicle.brand} ${vehicle.model} add to your electric bill in ${location.name}?`,
-      a: `Driving 1,000 miles/month in a ${vehicle.brand} ${vehicle.model} adds about ${formatCurrency(costs.monthlyHomeCost, 0)} to your monthly electric bill in ${location.name}. That's ${(100 / vehicle.efficiency_mi_per_kwh).toFixed(1)} kWh per 100 miles × $${location.electricity_rate.toFixed(2)}/kWh.`,
-    },
-  ];
+  const faqs = buildFaqs(vehicle, location, costs);
 
   const faqSchema = {
     '@context': 'https://schema.org',
@@ -155,16 +210,16 @@ export default async function ProgrammaticPage({ params }: { params: Promise<{ s
         {/* Section 1: Quick Answer */}
         <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-accent)', borderRadius: 16, padding: 28, marginBottom: 32 }}>
           <h2 style={{ fontSize: 18, fontWeight: 700, color: 'var(--accent)', marginBottom: 12 }}>Quick Answer</h2>
-          <p style={{ fontSize: 16, lineHeight: 1.7, color: 'var(--text)' }}>
+          <p style={{ fontSize: 16, lineHeight: 1.7, color: 'var(--text)', marginBottom: 12 }}>
             Charging a {vehicle.year} {vehicle.brand} {vehicle.model} at home in {location.name} costs approximately{' '}
             <strong style={{ color: 'var(--green)' }}>{formatCurrency(costs.monthlyHomeCost, 0)}/month</strong> — that&apos;s{' '}
             <strong style={{ color: 'var(--accent)' }}>{formatCurrencyPrecise(costs.costPerMile)}/mile</strong> and saves{' '}
             <strong style={{ color: 'var(--yellow)' }}>{formatCurrency(costs.annualSavingsVsGas, 0)}/year</strong>{' '}
             compared to a 28 MPG gas car at {location.name}&apos;s gas price of ${location.gas_price.toFixed(2)}/gallon.
           </p>
-          <p style={{ fontSize: 14, color: 'var(--text-muted)', marginTop: 12, lineHeight: 1.6 }}>
-            {vehicleContext[vehicle.body_type] || ''}{' '}
-            {climateContext[location.climate]}
+          <p style={{ fontSize: 14, color: 'var(--text-muted)', lineHeight: 1.6 }}>
+            {bodyTypeIntro[vehicle.body_type] || ''}{' '}
+            {climateRangeNote[location.climate]}
           </p>
         </div>
 
@@ -188,11 +243,59 @@ export default async function ProgrammaticPage({ params }: { params: Promise<{ s
           <ins className="adsbygoogle" style={{ display: 'block' }} data-ad-client="ca-pub-4323376361842642" data-ad-slot="auto" data-ad-format="auto" data-full-width-responsive="true" />
         </div>
 
-        {/* Section 2: Cost Breakdown Table */}
+        {/* Section 2: Vehicle Overview */}
+        {vc && (
+          <section style={{ marginBottom: 40 }}>
+            <h2 style={{ fontSize: 22, fontWeight: 700, marginBottom: 16, letterSpacing: '-0.3px' }}>
+              About the {vehicle.year} {vehicle.brand} {vehicle.model}
+            </h2>
+            <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 14, padding: 28, marginBottom: 16 }}>
+              <p style={{ fontSize: 15, lineHeight: 1.8, color: 'var(--text)', marginBottom: 20 }}>{vc.overview}</p>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--green)', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Advantages</div>
+                  {vc.pros.map((pro, i) => (
+                    <div key={i} style={{ display: 'flex', gap: 10, marginBottom: 8, alignItems: 'flex-start' }}>
+                      <span style={{ color: 'var(--green)', flexShrink: 0, marginTop: 2 }}>✓</span>
+                      <span style={{ fontSize: 14, color: 'var(--text-muted)', lineHeight: 1.5 }}>{pro}</span>
+                    </div>
+                  ))}
+                </div>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--red)', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Considerations</div>
+                  {vc.cons.map((con, i) => (
+                    <div key={i} style={{ display: 'flex', gap: 10, marginBottom: 8, alignItems: 'flex-start' }}>
+                      <span style={{ color: 'var(--red)', flexShrink: 0, marginTop: 2 }}>✗</span>
+                      <span style={{ fontSize: 14, color: 'var(--text-muted)', lineHeight: 1.5 }}>{con}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+              <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 12, padding: 20 }}>
+                <div style={{ fontSize: 12, color: 'var(--accent)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 8 }}>Ideal Buyer</div>
+                <p style={{ fontSize: 14, color: 'var(--text-muted)', lineHeight: 1.6 }}>{vc.idealBuyer}</p>
+              </div>
+              <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 12, padding: 20 }}>
+                <div style={{ fontSize: 12, color: 'var(--yellow)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 8 }}>vs. Gas Equivalent</div>
+                <p style={{ fontSize: 14, color: 'var(--text-muted)', lineHeight: 1.6 }}>{vc.gasEquivalent}</p>
+              </div>
+            </div>
+          </section>
+        )}
+
+        {/* Section 3: Cost Breakdown Table */}
         <section style={{ marginBottom: 40 }}>
-          <h2 style={{ fontSize: 22, fontWeight: 700, marginBottom: 16, letterSpacing: '-0.3px' }}>
+          <h2 style={{ fontSize: 22, fontWeight: 700, marginBottom: 12, letterSpacing: '-0.3px' }}>
             {vehicle.brand} {vehicle.model} Charging Cost Breakdown in {location.name}
           </h2>
+          <p style={{ fontSize: 14, color: 'var(--text-muted)', lineHeight: 1.6, marginBottom: 16 }}>
+            {location.name}&apos;s electricity rate of <strong style={{ color: 'var(--accent)' }}>${location.electricity_rate.toFixed(2)}/kWh</strong> is {rateComparison}.
+            At this rate, the {vehicle.brand} {vehicle.model}&apos;s {vehicle.battery_kwh} kWh battery costs{' '}
+            <strong>{formatCurrency(costs.costPerFullCharge, 2)}</strong> for a full charge —{' '}
+            {costs.annualSavingsVsGas > 1200 ? 'making it one of the more compelling EV economics in this state.' : 'a meaningful savings versus gas at current prices.'}
+          </p>
           <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 14, overflow: 'hidden' }}>
             <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr', padding: '12px 20px', background: 'var(--bg-card-hover)', fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.8px', color: 'var(--text-dim)' }}>
               <div>Charging Method</div><div>$/kWh</div><div>$/month</div><div>$/year</div>
@@ -216,11 +319,14 @@ export default async function ProgrammaticPage({ params }: { params: Promise<{ s
           </p>
         </section>
 
-        {/* Section 3: Vehicle Specs */}
+        {/* Section 4: Vehicle Specs */}
         <section style={{ marginBottom: 40 }}>
-          <h2 style={{ fontSize: 22, fontWeight: 700, marginBottom: 16, letterSpacing: '-0.3px' }}>
-            {vehicle.year} {vehicle.brand} {vehicle.model} Specs
+          <h2 style={{ fontSize: 22, fontWeight: 700, marginBottom: 12, letterSpacing: '-0.3px' }}>
+            {vehicle.year} {vehicle.brand} {vehicle.model} Specs &amp; Charging Data
           </h2>
+          {vc && (
+            <p style={{ fontSize: 14, color: 'var(--text-muted)', lineHeight: 1.6, marginBottom: 16 }}>{vc.chargingNotes}</p>
+          )}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
             {[
               { label: 'Battery', value: `${vehicle.battery_kwh} kWh` },
@@ -241,12 +347,38 @@ export default async function ProgrammaticPage({ params }: { params: Promise<{ s
           </div>
         </section>
 
-        {/* Section 4: State Electricity Context */}
+        {/* Section 5: State EV Landscape */}
+        {sc && (
+          <section style={{ marginBottom: 40 }}>
+            <h2 style={{ fontSize: 22, fontWeight: 700, marginBottom: 16, letterSpacing: '-0.3px' }}>
+              EV Ownership in {location.name}
+            </h2>
+            <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 14, padding: 28 }}>
+              <p style={{ fontSize: 15, lineHeight: 1.8, color: 'var(--text)', marginBottom: 16 }}>{sc.evMarket}</p>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+                <div style={{ background: 'var(--bg)', borderRadius: 10, padding: 16 }}>
+                  <div style={{ fontSize: 12, color: 'var(--accent)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 8 }}>Incentives &amp; Programs</div>
+                  <p style={{ fontSize: 14, color: 'var(--text-muted)', lineHeight: 1.6 }}>{sc.incentives}</p>
+                </div>
+                <div style={{ background: 'var(--bg)', borderRadius: 10, padding: 16 }}>
+                  <div style={{ fontSize: 12, color: 'var(--green)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 8 }}>Charging Infrastructure</div>
+                  <p style={{ fontSize: 14, color: 'var(--text-muted)', lineHeight: 1.6 }}>{sc.infrastructure}</p>
+                </div>
+              </div>
+              <div style={{ background: 'var(--bg)', borderRadius: 10, padding: 16 }}>
+                <div style={{ fontSize: 12, color: 'var(--yellow)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 8 }}>Grid &amp; Energy Source</div>
+                <p style={{ fontSize: 14, color: 'var(--text-muted)', lineHeight: 1.6 }}>{sc.gridSource}</p>
+              </div>
+            </div>
+          </section>
+        )}
+
+        {/* Section 6: State Electricity & EV Savings */}
         <section style={{ marginBottom: 40 }}>
           <h2 style={{ fontSize: 22, fontWeight: 700, marginBottom: 16, letterSpacing: '-0.3px' }}>
-            {location.name} Electricity Rates
+            {location.name} Electricity Rates &amp; EV Savings
           </h2>
-          <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 14, padding: 24 }}>
+          <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 14, padding: 24, marginBottom: 16 }}>
             <p style={{ fontSize: 15, lineHeight: 1.7, color: 'var(--text)', marginBottom: 12 }}>
               The average residential electricity rate in <strong>{location.name}</strong> is{' '}
               <strong style={{ color: 'var(--accent)' }}>${location.electricity_rate.toFixed(2)}/kWh</strong>, which is {rateComparison}.
@@ -254,14 +386,31 @@ export default async function ProgrammaticPage({ params }: { params: Promise<{ s
               {costs.annualSavingsVsGas > 1200 ? 'very favorable' : costs.annualSavingsVsGas > 600 ? 'favorable' : 'moderate'} state for EV ownership.
             </p>
             <p style={{ fontSize: 14, color: 'var(--text-muted)', lineHeight: 1.7 }}>
-              {climateContext[location.climate]} Your {vehicle.brand} {vehicle.model}&apos;s{' '}
-              {vehicle.battery_kwh} kWh battery provides up to {vehicle.range_mi} miles of range under EPA conditions.
+              {climateRangeNote[location.climate]} Your {vehicle.brand} {vehicle.model}&apos;s{' '}
+              {vehicle.battery_kwh} kWh battery provides up to {vehicle.range_mi} miles of EPA-rated range.
               Real-world range may vary by 10–30% depending on temperature, speed, and terrain.
             </p>
           </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+            <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 14, padding: 24 }}>
+              <div style={{ fontSize: 13, color: 'var(--text-dim)', marginBottom: 8 }}>Annual EV Cost (home)</div>
+              <div style={{ fontFamily: 'var(--font-space-mono), monospace', fontSize: 28, fontWeight: 700, color: 'var(--green)', marginBottom: 8 }}>{formatCurrency(costs.annualHomeCost, 0)}</div>
+              <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>{vehicle.brand} {vehicle.model} @ ${location.electricity_rate.toFixed(2)}/kWh</div>
+            </div>
+            <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 14, padding: 24 }}>
+              <div style={{ fontSize: 13, color: 'var(--text-dim)', marginBottom: 8 }}>Annual Gas Cost (28 MPG)</div>
+              <div style={{ fontFamily: 'var(--font-space-mono), monospace', fontSize: 28, fontWeight: 700, color: 'var(--red)', marginBottom: 8 }}>{formatCurrency(costs.annualGasCost, 0)}</div>
+              <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>@ ${location.gas_price.toFixed(2)}/gallon in {location.name}</div>
+            </div>
+          </div>
+          <div style={{ background: 'linear-gradient(135deg, rgba(52,211,153,0.1), rgba(34,211,238,0.1))', border: '1px solid var(--green)', borderRadius: 14, padding: 24, marginTop: 16, textAlign: 'center' }}>
+            <div style={{ fontSize: 14, color: 'var(--text-muted)', marginBottom: 8 }}>You save every year by driving electric in {location.name}</div>
+            <div style={{ fontFamily: 'var(--font-space-mono), monospace', fontSize: 36, fontWeight: 700, color: 'var(--green)' }}>{formatCurrency(costs.annualSavingsVsGas, 0)}/year</div>
+            <div style={{ fontSize: 13, color: 'var(--text-dim)', marginTop: 8 }}>That&apos;s {formatCurrency(costs.annualSavingsVsGas / 12, 0)}/month saved vs. a 28 MPG gas car</div>
+          </div>
         </section>
 
-        {/* Section 5: Home vs DC Fast visual */}
+        {/* Section 7: Home vs DC Fast visual */}
         <section style={{ marginBottom: 40 }}>
           <h2 style={{ fontSize: 22, fontWeight: 700, marginBottom: 16, letterSpacing: '-0.3px' }}>
             Home vs. DC Fast Charging in {location.name}
@@ -287,36 +436,35 @@ export default async function ProgrammaticPage({ params }: { params: Promise<{ s
           </div>
         </section>
 
-        {/* Section 6: EV vs Gas Savings */}
-        <section style={{ marginBottom: 40 }}>
-          <h2 style={{ fontSize: 22, fontWeight: 700, marginBottom: 16, letterSpacing: '-0.3px' }}>
-            EV vs Gas Savings in {location.name}
-          </h2>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-            <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 14, padding: 24 }}>
-              <div style={{ fontSize: 13, color: 'var(--text-dim)', marginBottom: 8 }}>Annual EV Cost (home)</div>
-              <div style={{ fontFamily: 'var(--font-space-mono), monospace', fontSize: 28, fontWeight: 700, color: 'var(--green)', marginBottom: 8 }}>{formatCurrency(costs.annualHomeCost, 0)}</div>
-              <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>{vehicle.brand} {vehicle.model} @ ${location.electricity_rate.toFixed(2)}/kWh</div>
+        {/* Section 8: Charging Tips */}
+        {sc && (
+          <section style={{ marginBottom: 40 }}>
+            <h2 style={{ fontSize: 22, fontWeight: 700, marginBottom: 16, letterSpacing: '-0.3px' }}>
+              Tips for Charging Your {vehicle.brand} {vehicle.model} in {location.name}
+            </h2>
+            <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 14, padding: 28 }}>
+              <p style={{ fontSize: 14, color: 'var(--text-muted)', lineHeight: 1.6, marginBottom: 20 }}>
+                {location.name}&apos;s {location.climate} climate and charging infrastructure have specific implications for {vehicle.brand} {vehicle.model} owners.
+                {' '}Here are practical tips to maximize range and minimize charging costs in this state:
+              </p>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 12 }}>
+                {sc.chargingTips.map((tip, i) => (
+                  <div key={i} style={{ display: 'flex', gap: 16, padding: '14px 18px', background: 'var(--bg)', borderRadius: 10, alignItems: 'flex-start' }}>
+                    <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'linear-gradient(135deg, var(--gradient-start), var(--gradient-end))', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, color: '#fff', flexShrink: 0 }}>{i + 1}</div>
+                    <p style={{ fontSize: 14, color: 'var(--text)', lineHeight: 1.6, margin: 0 }}>{tip}</p>
+                  </div>
+                ))}
+              </div>
             </div>
-            <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 14, padding: 24 }}>
-              <div style={{ fontSize: 13, color: 'var(--text-dim)', marginBottom: 8 }}>Annual Gas Cost (28 MPG)</div>
-              <div style={{ fontFamily: 'var(--font-space-mono), monospace', fontSize: 28, fontWeight: 700, color: 'var(--red)', marginBottom: 8 }}>{formatCurrency(costs.annualGasCost, 0)}</div>
-              <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>@ ${location.gas_price.toFixed(2)}/gallon in {location.name}</div>
-            </div>
-          </div>
-          <div style={{ background: 'linear-gradient(135deg, rgba(52,211,153,0.1), rgba(34,211,238,0.1))', border: '1px solid var(--green)', borderRadius: 14, padding: 24, marginTop: 16, textAlign: 'center' }}>
-            <div style={{ fontSize: 14, color: 'var(--text-muted)', marginBottom: 8 }}>You save every year by driving electric in {location.name}</div>
-            <div style={{ fontFamily: 'var(--font-space-mono), monospace', fontSize: 36, fontWeight: 700, color: 'var(--green)' }}>{formatCurrency(costs.annualSavingsVsGas, 0)}/year</div>
-            <div style={{ fontSize: 13, color: 'var(--text-dim)', marginTop: 8 }}>That&apos;s {formatCurrency(costs.annualSavingsVsGas / 12, 0)}/month saved vs. a 28 MPG gas car</div>
-          </div>
-        </section>
+          </section>
+        )}
 
         {/* Ad slot */}
         <div style={{ background: 'var(--bg-card)', border: '1px dashed var(--border)', borderRadius: 12, padding: 16, textAlign: 'center', margin: '0 0 32px', minHeight: 90, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <ins className="adsbygoogle" style={{ display: 'block' }} data-ad-client="ca-pub-4323376361842642" data-ad-slot="auto" data-ad-format="auto" data-full-width-responsive="true" />
         </div>
 
-        {/* Section 7: FAQ */}
+        {/* Section 9: FAQ */}
         <section style={{ marginBottom: 40 }}>
           <h2 style={{ fontSize: 22, fontWeight: 700, marginBottom: 20, letterSpacing: '-0.3px' }}>
             Frequently Asked Questions
@@ -331,7 +479,7 @@ export default async function ProgrammaticPage({ params }: { params: Promise<{ s
           ))}
         </section>
 
-        {/* Section 8: Related Pages */}
+        {/* Section 10: Related Pages */}
         <section style={{ marginBottom: 40 }}>
           <h2 style={{ fontSize: 22, fontWeight: 700, marginBottom: 20, letterSpacing: '-0.3px' }}>
             {vehicle.brand} {vehicle.model} in Other States
@@ -370,7 +518,7 @@ export default async function ProgrammaticPage({ params }: { params: Promise<{ s
           </div>
         </section>
 
-        {/* CTA back to calculator */}
+        {/* CTA */}
         <div style={{ textAlign: 'center', padding: 28, background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 14 }}>
           <p style={{ color: 'var(--text-muted)', marginBottom: 12 }}>Want a personalized calculation based on your actual driving habits?</p>
           <Link href="/" style={{ display: 'inline-block', padding: '12px 28px', background: 'linear-gradient(135deg, var(--gradient-start), var(--gradient-end))', borderRadius: 10, color: '#fff', textDecoration: 'none', fontWeight: 600, fontSize: 15 }}>
