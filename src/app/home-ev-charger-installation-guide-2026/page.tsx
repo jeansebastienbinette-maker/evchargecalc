@@ -59,6 +59,50 @@ export default function HomeChargerPage() {
 
       <ins className="adsbygoogle" style={{ display: 'block', marginBottom: 32 }} data-ad-client="ca-pub-4323376361842642" data-ad-slot="auto" data-ad-format="auto" data-full-width-responsive="true" />
 
+      <section style={{ marginBottom: 40 }}>
+        <h2 style={{ fontSize: 22, fontWeight: 700, marginBottom: 20 }}>Top Level 2 Chargers — Check Amazon Prices</h2>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16 }}>
+          {[
+            {
+              name: 'ChargePoint Home Flex',
+              desc: 'Adjustable 16–50A output, WiFi, app control, works with any EV. The most flexible home charger on the market.',
+              url: 'https://www.amazon.com/dp/B09GY22GV9?tag=evchargecalc2-20',
+            },
+            {
+              name: 'Tesla Wall Connector',
+              desc: '48A, sleek design, Wi-Fi connected. Best option for Tesla owners; also compatible with non-Tesla EVs via J1772 adapter.',
+              url: 'https://www.amazon.com/dp/B0CRWGKJXR?tag=evchargecalc2-20',
+            },
+            {
+              name: 'Emporia EV Charger',
+              desc: '48A smart charger with real-time energy monitoring. Best value for smart home integration and time-of-use scheduling.',
+              url: 'https://www.amazon.com/dp/B0D1NKXCK3?tag=evchargecalc2-20',
+            },
+            {
+              name: 'Grizzl-E Classic',
+              desc: '40A, ultra-durable NEMA 14-50, built for harsh weather. Best pick for garages and outdoor installs on a budget.',
+              url: 'https://www.amazon.com/dp/B08GSCRLQB?tag=evchargecalc2-20',
+            },
+          ].map(p => (
+            <div key={p.name} style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 14, padding: 22, display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>{p.name}</div>
+              <p style={{ fontSize: 14, color: 'var(--text-muted)', lineHeight: 1.7, margin: 0, flex: 1 }}>{p.desc}</p>
+              <a
+                href={p.url}
+                target="_blank"
+                rel="noopener sponsored"
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600, color: 'var(--accent)', textDecoration: 'none', borderTop: '1px solid var(--border)', paddingTop: 12 }}
+              >
+                Check Price on Amazon →
+              </a>
+            </div>
+          ))}
+        </div>
+        <p style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 12 }}>
+          As an Amazon Associate, evchargecalc.com earns from qualifying purchases.
+        </p>
+      </section>
+
       <div style={{ textAlign: 'center', padding: 24, background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 14 }}>
         <Link href="/" style={{ display: 'inline-block', padding: '12px 28px', background: 'linear-gradient(135deg, var(--gradient-start), var(--gradient-end))', borderRadius: 10, color: '#fff', textDecoration: 'none', fontWeight: 600 }}>
           ⚡ Calculate Your Home Charging Cost
