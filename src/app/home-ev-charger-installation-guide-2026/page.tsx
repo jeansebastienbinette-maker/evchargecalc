@@ -64,24 +64,24 @@ export default function HomeChargerPage() {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16 }}>
           {[
             {
-              name: 'ChargePoint Home Flex',
-              desc: 'Adjustable 16–50A output, WiFi, app control, works with any EV. The most flexible home charger on the market.',
-              url: 'https://www.amazon.com/dp/B09GY22GV9?tag=evchargecalc2-20',
+              name: 'Emporia Level 2 EV Charger 48A',
+              desc: '48A smart charger with real-time energy monitoring, time-of-use scheduling, and solar integration. Best value for smart home setups.',
+              url: 'https://www.amazon.com/dp/B09ZNN3JB7?tag=evchargecalc2-20',
             },
             {
-              name: 'Tesla Wall Connector',
-              desc: '48A, sleek design, Wi-Fi connected. Best option for Tesla owners; also compatible with non-Tesla EVs via J1772 adapter.',
-              url: 'https://www.amazon.com/dp/B0CRWGKJXR?tag=evchargecalc2-20',
+              name: 'Grizzl-E Classic 40A',
+              desc: '40A, ultra-durable metal case, UL certified, NEMA 14-50 plug. Built for harsh weather — best budget pick for outdoor and garage installs.',
+              url: 'https://www.amazon.com/dp/B082LMVSLY?tag=evchargecalc2-20',
             },
             {
-              name: 'Emporia EV Charger',
-              desc: '48A smart charger with real-time energy monitoring. Best value for smart home integration and time-of-use scheduling.',
-              url: 'https://www.amazon.com/dp/B0D1NKXCK3?tag=evchargecalc2-20',
+              name: 'Autel MaxiCharger 40A',
+              desc: 'Wi-Fi and Bluetooth enabled, 40A, 25-ft cable, NEMA 14-50. Smart AI scheduling, easy app control, compatible with all J1772 EVs.',
+              url: 'https://www.amazon.com/dp/B0B3RLFF2D?tag=evchargecalc2-20',
             },
             {
-              name: 'Grizzl-E Classic',
-              desc: '40A, ultra-durable NEMA 14-50, built for harsh weather. Best pick for garages and outdoor installs on a budget.',
-              url: 'https://www.amazon.com/dp/B08GSCRLQB?tag=evchargecalc2-20',
+              name: 'Wallbox Pulsar Plus 40A',
+              desc: 'Ultra-compact 40A, 9.6kW, Energy Star & UL certified, assembled in the USA. 25-ft J1772 cable, smart scheduling via app.',
+              url: 'https://www.amazon.com/dp/B08H2LYFHX?tag=evchargecalc2-20',
             },
           ].map(p => (
             <div key={p.name} style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 14, padding: 22, display: 'flex', flexDirection: 'column', gap: 12 }}>
