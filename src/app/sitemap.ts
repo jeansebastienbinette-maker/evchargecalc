@@ -20,6 +20,8 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { url: `${baseUrl}/solar-ev-charging-savings-2026`, changeFrequency: 'monthly', priority: 0.8 },
     { url: `${baseUrl}/ev-tax-credits-incentives-2026`, changeFrequency: 'monthly', priority: 0.8 },
     { url: `${baseUrl}/ev-road-trip-charging-cost-calculator-2026`, changeFrequency: 'monthly', priority: 0.7 },
+    { url: `${baseUrl}/tesla-model-y-charging-cost-home-vs-public-2026`, changeFrequency: 'monthly', priority: 0.8 },
+    { url: `${baseUrl}/how-long-does-it-take-to-charge-an-ev-2026`, changeFrequency: 'monthly', priority: 0.9 },
   ];
 
   const vehiclePages: MetadataRoute.Sitemap = vehicles.map(v => ({
